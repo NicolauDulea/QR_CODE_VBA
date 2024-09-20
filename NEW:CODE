@@ -1,0 +1,76 @@
+Sub DistribuirDadosQR()
+    Dim DadosQR As String
+    Dim PartesQR() As String
+    Dim LinhaAtual As Integer
+    Dim NumeroFatura As String
+    Dim Valor As String
+    Dim DataFatura As String
+    Dim wsSource As Worksheet
+    Dim wsDest As Worksheet
+    Dim LinhaResumo As Integer
+    Dim i As Integer
+
+    ' Especificar as planilhas de origem e destino
+    Set wsSource = ThisWorkbook.Worksheets("LER QR CODE")
+    Set wsDest = ThisWorkbook.Worksheets("09.24")
+
+    ' Ler dados do QR na célula D3 da planilha "LER QR CODE"
+    DadosQR = wsSource.Range("D3").Value
+
+    ' Dividir os dados do QR com base no delimitador "*"
+    PartesQR = Split(DadosQR, "*")
+
+    ' Inicializar as variáveis para evitar problemas com dados ausentes
+    NumeroFatura = ""
+    Valor = ""
+    DataFatura = ""
+
+    ' Percorrer cada parte e identificar pelo prefixo
+    For i = LBound(PartesQR) To UBound(PartesQR)
+        Select Case Left(PartesQR(i), 2)
+            Case "G:"
+                NumeroFatura = Trim(Mid(PartesQR(i), 3))  ' Pegar Número da Fatura sem "G:"
+            Case "O:"
+                Valor = Trim(Mid(PartesQR(i), 3))         ' Pegar Valor sem "O:"
+            Case "F:"
+                DataFatura = Trim(Mid(PartesQR(i), 3))    ' Pegar Data da Fatura sem "F:"
+        End Select
+    Next i
+
+    ' Verificar se todos os dados foram preenchidos corretamente
+    If NumeroFatura <> "" And Valor <> "" And DataFatura <> "" Then
+        ' Converter DataFatura para o formato correto (AAAA-MM-DD para DD/MM/AAAA)
+        DataFatura = Format(DateSerial(Left(DataFatura, 4), Mid(DataFatura, 5, 2), Right(DataFatura, 2)), "DD/MM/YYYY")
+        
+        ' Converter o valor para o formato correto (decimal com vírgula)
+        Valor = Replace(Format(Val(Valor), "#,##0.00"), ".", ",")
+
+        ' Encontrar a próxima linha disponível
+        LinhaAtual = wsDest.Cells(wsDest.Rows.Count, 4).End(xlUp).Row + 1
+
+        ' Inserir os dados nas colunas D, E, F, e H da nova linha
+        wsDest.Cells(LinhaAtual, 4).Value = NumeroFatura  ' Inserir Número da Fatura na coluna D
+        wsDest.Cells(LinhaAtual, 5).Value = Valor & €   ' Inserir Valor na coluna E com símbolo €
+        wsDest.Cells(LinhaAtual, 6).Value = Abs(Valor) & €  ' Inserir valor absoluto na coluna F com símbolo €
+        wsDest.Cells(LinhaAtual, 8).Value = DataFatura    ' Inserir Data de Recebimento na coluna H
+
+        ' Atualizar as fórmulas da linha de resumo, somando apenas as linhas preenchidas e ignorando a linha de resumo
+        LinhaResumo = LinhaAtual + 2 ' Linha de resumo será duas linhas abaixo da última preenchida
+
+        ' Mover o template para a nova posição
+        wsDest.Rows(4).Insert Shift:=xlDown ' Insere o template na linha 4, movendo-o para baixo
+
+        ' Atualizar as fórmulas da linha de resumo, somando as colunas
+        wsDest.Cells(LinhaResumo, 2).Formula = "=SUM(B3:B" & LinhaAtual & ")"  ' Somar coluna B
+        wsDest.Cells(LinhaResumo, 3).Formula = "=SUM(C3:C" & LinhaAtual & ")"  ' Somar coluna C
+        wsDest.Cells(LinhaResumo, 5).Formula = "=SUM(E3:E" & LinhaAtual & ")"  ' Somar coluna E
+        wsDest.Cells(LinhaResumo, 11).Formula = "=SUM(K3:K" & LinhaAtual & ")" ' Somar coluna K
+
+    Else
+        MsgBox "Os dados do QR estão incompletos ou não estão no formato esperado."
+    End If
+
+    ' Limpar a célula D3 para a próxima leitura
+    wsSource.Range("D3").ClearContents
+End Sub
+
